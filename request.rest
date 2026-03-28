@@ -1,0 +1,9 @@
+POST http://localhost:3000/api/inventory
+Content-Type: application/json
+
+{
+    "itemName": "Water Bottle",
+    "size": "1L",
+    "price": 10,
+    "totalStock": 100
+}

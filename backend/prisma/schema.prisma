@@ -1,0 +1,108 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  DELIVERY
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  ASSIGNED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PAID
+  UNPAID
+}
+
+enum AppStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id                Int            @id @default(autoincrement())
+  name              String
+  phone             String         @unique
+  email             String?
+  address           String?        @db.Text
+  password          String
+  role              Role           @default(CUSTOMER)
+  deliveryAppStatus AppStatus      @default(NONE)
+  fcmToken          String?        @db.Text
+  createdAt         DateTime       @default(now())
+
+  orders            Order[]
+  assignedOrders    Order[]        @relation("AssignedDelivery")
+  subscriptions     Subscription[]
+  refreshTokens     RefreshToken[]
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique @db.VarChar(500)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Inventory {
+  id             Int      @id @default(autoincrement())
+  itemName       String   @unique
+  size           String
+  price          Float
+  totalStock     Int      @default(0)
+  reservedStock  Int      @default(0)
+  createdAt      DateTime @default(now())
+}
+
+model Order {
+  id                 Int           @id @default(autoincrement())
+  userId             Int
+  user               User          @relation(fields: [userId], references: [id])
+  address            String        @db.Text
+  status             OrderStatus   @default(PENDING)
+  paymentStatus      PaymentStatus @default(UNPAID)
+  assignedDeliveryId Int?
+  deliveryAgent      User?         @relation("AssignedDelivery", fields: [assignedDeliveryId], references: [id])
+  deliveryDate       DateTime?
+  timeSlot           String?
+  createdAt          DateTime      @default(now())
+
+  items OrderItem[]
+}
+
+model OrderItem {
+  id       Int   @id @default(autoincrement())
+  orderId  Int
+  order    Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId   Int
+  quantity Int
+  price    Float
+}
+
+model Subscription {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  user             User     @relation(fields: [userId], references: [id])
+  itemId           Int
+  quantity         Int
+  frequency        String   // e.g., "every 2 days", or cron format
+  nextDeliveryDate DateTime
+  active           Boolean  @default(true)
+}

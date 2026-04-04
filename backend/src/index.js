@@ -2,6 +2,7 @@ import { Elysia } from "elysia";
 import { swagger } from "@elysiajs/swagger";
 import { cron } from "@elysiajs/cron";
 import { cors } from "@elysiajs/cors";
+import { staticPlugin } from "@elysiajs/static";
 
 // Middlewares
 import { errorHandler } from "./middlewares/error";
@@ -19,6 +20,7 @@ import { processDailySubscriptions } from "./modules/subscription/subscription.s
 
 const app = new Elysia()
   .use(cors())
+  .use(staticPlugin({ assets: "public", prefix: "/public" }))
   .use(
     swagger({
       path: "/swagger",

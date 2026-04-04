@@ -179,3 +179,19 @@ export const processDailySubscriptions = async () => {
     }
   }
 };
+
+export const getSubscriptionsByUserId = async (userId) => {
+  return prisma.subscription.findMany({
+    where: { userId },
+    include: {
+      inventory: {
+        select: {
+          itemName: true,
+          size: true,
+          price: true
+        }
+      }
+    },
+    orderBy: { createdAt: "desc" },
+  });
+};

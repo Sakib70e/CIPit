@@ -29,3 +29,13 @@ export const cancelController = async ({ user, params: { id }, set }) => {
     return { success: false, message: error.message };
   }
 };
+
+export const getByUserSubscriptionController = async ({ user, set }) => {
+  try {
+    const subs = await subService.getSubscriptionsByUserId(user.id);
+    return { success: true, data: subs };
+  } catch (error) {
+    set.status = 400;
+    return { success: false, message: error.message };
+  }
+};

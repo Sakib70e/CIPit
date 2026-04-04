@@ -9,6 +9,7 @@ import {
   updateStatusCtrl,
   updateDeliveryDateCtrl,
   updatePaymentCtrl,
+  getAgentOrdersCtrl,
 } from "./order.controller";
 import { authState, isAuthenticated, isDeliveryOrAdmin } from "../../middlewares/auth";
 
@@ -46,6 +47,9 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
   // Delivery & Admin routes
   .guard({ beforeHandle: [isDeliveryOrAdmin] }, (app) =>
     app
+      .get("/tasks", getAgentOrdersCtrl, {
+        detail: { summary: "Get all orders assigned to me", tags: ["Orders", "Delivery"] },
+      })
       .get("/unassigned", getUnassignedCtrl, {
         detail: { summary: "Get all unassigned orders", tags: ["Orders", "Delivery"] },
       })

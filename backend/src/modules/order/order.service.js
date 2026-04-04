@@ -113,7 +113,7 @@ export const updateOrderAddress = async (userId, orderId, address) => {
 export const getUnassignedOrders = async () => {
   const orders = await prisma.order.findMany({
     where: { status: "PENDING", assignedDeliveryId: null },
-    include: { items: true },
+    include: { items: { include: { inventory: true } }, user: { select: { name: true, phone: true } } },
   });
   return orders.map(calculateOrderTotals);
 };
@@ -121,7 +121,22 @@ export const getUnassignedOrders = async () => {
 export const getUserOrders = async (userId) => {
   const orders = await prisma.order.findMany({
     where: { userId },
-    include: { items: true, deliveryAgent: { select: { name: true, phone: true } } },
+    include: { 
+      items: { include: { inventory: true } }, 
+      deliveryAgent: { select: { name: true, phone: true } } 
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  return orders.map(calculateOrderTotals);
+};
+
+export const getOrdersByAgent = async (agentId) => {
+  const orders = await prisma.order.findMany({
+    where: { assignedDeliveryId: agentId },
+    include: { 
+      items: { include: { inventory: true } }, 
+      user: { select: { name: true, phone: true } } 
+    },
     orderBy: { createdAt: "desc" },
   });
   return orders.map(calculateOrderTotals);

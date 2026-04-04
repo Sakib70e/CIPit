@@ -82,3 +82,19 @@ export const changeUserRole = async (userId, role) => {
     data: { role },
   });
 };
+
+export const getAllUsers = async () => {
+  return prisma.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      email: true,
+      address: true,
+      role: true,
+      deliveryAppStatus: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+};

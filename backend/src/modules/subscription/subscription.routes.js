@@ -1,11 +1,19 @@
-import { Elysia, t } from "elysia";
-import { createController, updateController, cancelController } from "./subscription.controller";
+import {
+  createController,
+  updateController,
+  cancelController,
+  getByUserSubscriptionController,
+} from "./subscription.controller";
 import { authState, isAuthenticated } from "../../middlewares/auth";
+import { Elysia, t } from "elysia";
 
 export const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
   .use(authState)
   .guard({ beforeHandle: [isAuthenticated] }, (app) =>
     app
+      .get("/", getByUserSubscriptionController, {
+        detail: { summary: "Get my subscriptions", tags: ["Subscriptions"] },
+      })
       .post("/", createController, {
         body: t.Object({
           itemId: t.Number(),

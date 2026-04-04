@@ -1,6 +1,7 @@
 import { prisma } from "../../db";
 import { hashPassword, verifyPassword } from "../../utils/hash";
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
+import { sendResetEmail } from "../../utils/mail";
 
 export const register = async ({ name, phone, password, address, email }) => {
   const existingUser = await prisma.user.findUnique({ where: { phone } });
@@ -82,4 +83,63 @@ export const revokeRefreshToken = async (token) => {
     where: { token },
     data: { revoked: true },
   });
+};
+
+export const forgotPassword = async ({ email }) => {
+  const user = await prisma.user.findFirst({ where: { email } });
+  
+  if (!user) {
+    // Return success message even if email doesn't exist for security reasons
+    return { success: true };
+  }
+
+  // Generate 6-digit code
+  const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const resetCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { resetCode, resetCodeExpires },
+  });
+
+  const previewUrl = await sendResetEmail(email, resetCode);
+  return { previewUrl };
+};
+
+export const verifyResetCode = async ({ email, code }) => {
+  const user = await prisma.user.findFirst({
+    where: { 
+      email,
+      resetCode: code,
+      resetCodeExpires: { gt: new Date() } 
+    }
+  });
+
+  if (!user) throw new Error("Invalid or expired reset code.");
+  return { success: true };
+};
+
+export const resetPassword = async ({ email, code, newPassword }) => {
+  const user = await prisma.user.findFirst({
+    where: { 
+      email,
+      resetCode: code,
+      resetCodeExpires: { gt: new Date() } 
+    }
+  });
+
+  if (!user) throw new Error("Verification failed. Please request a new code.");
+
+  const hashedPassword = await hashPassword(newPassword);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { 
+      password: hashedPassword,
+      resetCode: null,
+      resetCodeExpires: null 
+    },
+  });
+
+  return { success: true };
 };

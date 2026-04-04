@@ -34,21 +34,23 @@ enum AppStatus {
 }
 
 model User {
-  id                Int            @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   name              String
-  phone             String         @unique
-  email             String?
-  address           String?        @db.Text
+  phone             String    @unique
+  email             String?   @unique
+  address           String?   @db.Text
   password          String
-  role              Role           @default(CUSTOMER)
-  deliveryAppStatus AppStatus      @default(NONE)
-  fcmToken          String?        @db.Text
-  createdAt         DateTime       @default(now())
+  role              Role      @default(CUSTOMER)
+  deliveryAppStatus AppStatus @default(NONE)
+  fcmToken          String?   @db.Text
+  resetCode         String?
+  resetCodeExpires  DateTime?
+  createdAt         DateTime  @default(now())
 
-  orders            Order[]
-  assignedOrders    Order[]        @relation("AssignedDelivery")
-  subscriptions     Subscription[]
-  refreshTokens     RefreshToken[]
+  orders         Order[]
+  assignedOrders Order[]        @relation("AssignedDelivery")
+  subscriptions  Subscription[]
+  refreshTokens  RefreshToken[]
 }
 
 model RefreshToken {
@@ -62,13 +64,17 @@ model RefreshToken {
 }
 
 model Inventory {
-  id             Int      @id @default(autoincrement())
-  itemName       String   @unique
-  size           String
-  price          Float
-  totalStock     Int      @default(0)
-  reservedStock  Int      @default(0)
-  createdAt      DateTime @default(now())
+  id            Int           @id @default(autoincrement())
+  itemName      String        @unique
+  size          String
+  price         Float
+  totalStock    Int           @default(0)
+  reservedStock Int           @default(0)
+  imageUrl      String?       @db.Text
+  createdAt     DateTime      @default(now())
+
+  orderItems    OrderItem[]
+  subscriptions Subscription[]
 }
 
 model Order {
@@ -88,21 +94,23 @@ model Order {
 }
 
 model OrderItem {
-  id       Int   @id @default(autoincrement())
-  orderId  Int
-  order    Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  itemId   Int
-  quantity Int
-  price    Float
+  id        Int       @id @default(autoincrement())
+  orderId   Int
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId    Int
+  inventory Inventory @relation(fields: [itemId], references: [id])
+  quantity  Int
+  price     Float
 }
 
 model Subscription {
-  id               Int      @id @default(autoincrement())
+  id               Int       @id @default(autoincrement())
   userId           Int
-  user             User     @relation(fields: [userId], references: [id])
+  user             User      @relation(fields: [userId], references: [id])
   itemId           Int
+  inventory        Inventory @relation(fields: [itemId], references: [id])
   quantity         Int
-  frequency        String   // e.g., "every 2 days", or cron format
+  frequency        String
   nextDeliveryDate DateTime
-  active           Boolean  @default(true)
+  active           Boolean   @default(true)
 }

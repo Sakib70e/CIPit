@@ -89,3 +89,37 @@ export const revokeController = async ({ body, set }) => {
     return { success: false, message: error.message };
   }
 };
+
+export const forgotPasswordController = async ({ body, set }) => {
+  try {
+    const { previewUrl } = await authService.forgotPassword(body);
+    return {
+      success: true,
+      message: "Reset link sent successfully",
+      data: { previewUrl },
+    };
+  } catch (error) {
+    set.status = 400;
+    return { success: false, message: error.message };
+  }
+};
+
+export const verifyResetCodeController = async ({ body, set }) => {
+  try {
+    const result = await authService.verifyResetCode(body);
+    return { success: true, message: "Code verified", data: result };
+  } catch (error) {
+    set.status = 400;
+    return { success: false, message: error.message };
+  }
+};
+
+export const resetPasswordController = async ({ body, set }) => {
+  try {
+    const result = await authService.resetPassword(body);
+    return { success: true, message: "Password reset successful", data: result };
+  } catch (error) {
+    set.status = 400;
+    return { success: false, message: error.message };
+  }
+};

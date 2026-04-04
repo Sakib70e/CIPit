@@ -1,4 +1,5 @@
 import * as invService from "./inventory.service";
+import { saveFile } from "../../utils/upload";
 
 export const getAllController = async ({ set }) => {
   try {
@@ -22,7 +23,16 @@ export const getByIdController = async ({ params: { id }, set }) => {
 
 export const createController = async ({ body, set }) => {
   try {
-    const item = await invService.createItem(body);
+    const { image, ...data } = body;
+    if (image) {
+      data.imageUrl = await saveFile(image);
+    }
+    
+    // Parse numeric fields for Prisma compatibility
+    if (data.price) data.price = parseFloat(data.price);
+    if (data.totalStock) data.totalStock = parseInt(data.totalStock);
+
+    const item = await invService.createItem(data);
     return { success: true, message: "Item created", data: item };
   } catch (error) {
     set.status = 400;
@@ -32,7 +42,16 @@ export const createController = async ({ body, set }) => {
 
 export const updateController = async ({ params: { id }, body, set }) => {
   try {
-    const item = await invService.updateItem(Number(id), body);
+    const { image, ...data } = body;
+    if (image) {
+      data.imageUrl = await saveFile(image);
+    }
+
+    // Parse numeric fields for Prisma compatibility
+    if (data.price) data.price = parseFloat(data.price);
+    if (data.totalStock) data.totalStock = parseInt(data.totalStock);
+
+    const item = await invService.updateItem(Number(id), data);
     return { success: true, message: "Item updated", data: item };
   } catch (error) {
     set.status = 400;

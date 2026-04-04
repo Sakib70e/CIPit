@@ -44,32 +44,47 @@ export const bootstrapAdmin = async ({ name, phone, password, supervisor_key }) 
 };
 
 export const getDashboardStats = async () => {
-  const usersCount = await prisma.user.groupBy({
-    by: ['role'],
-    _count: true
-  });
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  const ordersCount = await prisma.order.groupBy({
-    by: ['status'],
-    _count: true
-  });
-
-  // Revenue calculation for DELIVERED orders
-  const deliveredOrders = await prisma.order.findMany({
-    where: { status: 'DELIVERED' },
-    include: { items: true }
-  });
+  const [
+    usersCount,
+    ordersCount,
+    inventorySummary,
+    deliveredOrders,
+    deliveredTodayCount,
+    activeSubsCount,
+    totalCustomers,
+  ] = await Promise.all([
+    prisma.user.groupBy({ by: ["role"], _count: true }),
+    prisma.order.groupBy({ by: ["status"], _count: true }),
+    prisma.inventory.findMany(),
+    prisma.order.findMany({ where: { status: "DELIVERED" }, include: { items: true } }),
+    prisma.order.count({
+      where: {
+        status: "DELIVERED",
+        createdAt: { gte: today },
+      },
+    }),
+    prisma.subscription.count({ where: { active: true } }),
+    prisma.user.count({ where: { role: "CUSTOMER" } }),
+  ]);
 
   let totalRevenue = 0;
-  deliveredOrders.forEach(order => {
-    order.items.forEach(item => {
+  deliveredOrders.forEach((order) => {
+    order.items.forEach((item) => {
       totalRevenue += item.price * item.quantity;
     });
   });
 
-  const inventorySummary = await prisma.inventory.findMany();
+  const totalStock = inventorySummary.reduce((sum, i) => sum + i.totalStock, 0);
+  const reservedStock = inventorySummary.reduce((sum, i) => sum + i.reservedStock, 0);
+  const availableStock = totalStock - reservedStock;
+
   const lowStockThreshold = 10;
-  const lowStockItems = inventorySummary.filter(i => (i.totalStock - i.reservedStock) < lowStockThreshold);
+  const lowStockItems = inventorySummary.filter(
+    (i) => i.totalStock - i.reservedStock < lowStockThreshold
+  );
 
   return {
     revenue: totalRevenue,
@@ -77,10 +92,80 @@ export const getDashboardStats = async () => {
     orders: ordersCount,
     inventory: {
       totalItems: inventorySummary.length,
+      totalStock,
+      availableStock,
+      reservedStock,
       lowStock: lowStockItems.length,
-      lowStockItems: lowStockItems.map(i => i.itemName)
-    }
+      lowStockItems: lowStockItems.map((i) => i.itemName),
+    },
+    deliveredToday: deliveredTodayCount,
+    activeSubscriptions: activeSubsCount,
+    totalCustomers,
+    pendingOrdersCount: ordersCount.find((o) => o.status === "PENDING")?._count || 0,
+    system: {
+      dbStatus: "CONNECTED",
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    },
   };
+};
+
+export const getAllOrders = async () => {
+  const orders = await prisma.order.findMany({
+    include: {
+      items: { include: { inventory: true } },
+      user: { select: { id: true, name: true, phone: true, address: true } },
+      deliveryAgent: { select: { id: true, name: true, phone: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return orders.map((order) => {
+    const totalPrice = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    return { ...order, totalPrice };
+  });
+};
+
+export const deleteOrder = async (orderId) => {
+  return await prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!order) throw new Error("Order not found");
+
+    // If order was pending or assigned, release reserved stock
+    if (order.status === "PENDING" || order.status === "ASSIGNED") {
+      for (const item of order.items) {
+        await tx.inventory.update({
+          where: { id: item.itemId },
+          data: { reservedStock: { decrement: item.quantity } },
+        });
+      }
+    }
+
+    return tx.order.delete({ where: { id: orderId } });
+  });
+};
+
+export const adminAssignOrder = async (orderId, agentId) => {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) throw new Error("Order not found");
+
+  const agent = await prisma.user.findUnique({ where: { id: agentId } });
+  if (!agent || (agent.role !== "DELIVERY" && agent.role !== "ADMIN")) {
+    throw new Error("Invalid delivery agent");
+  }
+
+  return prisma.order.update({
+    where: { id: orderId },
+    data: {
+      assignedDeliveryId: agentId,
+      status: "ASSIGNED",
+    },
+    include: { items: true, deliveryAgent: true },
+  });
 };
 
 export const adjustInventoryStock = async (itemId, amount) => {
@@ -94,5 +179,19 @@ export const adjustInventoryStock = async (itemId, amount) => {
   return prisma.inventory.update({
     where: { id: itemId },
     data: { totalStock: { increment: amount } }
+  });
+};
+
+export const getDeliveryAgents = async () => {
+  return prisma.user.findMany({
+    where: {
+      role: { in: ["DELIVERY", "ADMIN"] },
+    },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      role: true,
+    },
   });
 };

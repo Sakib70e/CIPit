@@ -1,7 +1,11 @@
 import { prisma } from "../../db";
 
 export const getAllItems = async () => {
-  return prisma.inventory.findMany();
+  const items = await prisma.inventory.findMany();
+  return items.map(item => ({
+    ...item,
+    availableStock: item.totalStock - item.reservedStock
+  }));
 };
 
 export const getItemById = async (id) => {

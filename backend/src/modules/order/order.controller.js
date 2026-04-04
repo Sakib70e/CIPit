@@ -41,6 +41,16 @@ export const getUserOrdersCtrl = async ({ user, set }) => {
   }
 };
 
+export const getAgentOrdersCtrl = async ({ user, set }) => {
+  try {
+    const orders = await orderService.getOrdersByAgent(user.id);
+    return { success: true, data: orders };
+  } catch (error) {
+    set.status = 500;
+    return { success: false, message: error.message };
+  }
+};
+
 // Delivery & Admin actions
 export const getUnassignedCtrl = async ({ set }) => {
   try {

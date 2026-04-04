@@ -5,6 +5,9 @@ import {
   loginController,
   refreshController,
   revokeController,
+  forgotPasswordController,
+  verifyResetCodeController,
+  resetPasswordController,
 } from "./auth.controller";
 import { jwtSetup } from "../../middlewares/auth";
 
@@ -20,7 +23,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
       phone: t.String(),
       password: t.String(),
       address: t.Optional(t.String()),
-      email: t.Optional(t.String()),
+      email: t.String(),
     }),
     detail: { summary: "Register new customer", tags: ["Auth"] },
   })
@@ -61,4 +64,25 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
       detail: { summary: "Revoke Refresh Token", tags: ["Auth"] },
       body: t.Any()
     }
-  );
+  )
+  .post("/forgot-password", (ctx) => forgotPasswordController(ctx), {
+    body: t.Object({
+      email: t.String(),
+    }),
+    detail: { summary: "Send password reset link via email", tags: ["Auth"] },
+  })
+  .post("/verify-reset-code", (ctx) => verifyResetCodeController(ctx), {
+    body: t.Object({
+      email: t.String(),
+      code: t.String({ minLength: 6, maxLength: 6 }),
+    }),
+    detail: { summary: "Verify 6-digit reset code", tags: ["Auth"] },
+  })
+  .post("/reset-password", (ctx) => resetPasswordController(ctx), {
+    body: t.Object({
+      email: t.String(),
+      code: t.String({ minLength: 6, maxLength: 6 }),
+      newPassword: t.String({ minLength: 6 }),
+    }),
+    detail: { summary: "Update password using reset code", tags: ["Auth"] },
+  });

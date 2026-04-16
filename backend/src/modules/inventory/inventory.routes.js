@@ -27,6 +27,7 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
           size: t.String(),
           price: t.String(), // comes as string from FormData, parsed in controller
           totalStock: t.Optional(t.String()),
+          lowStockThreshold: t.Optional(t.String()),
           image: t.Optional(t.File()),
         }),
         detail: { summary: "Create new inventory item", tags: ["Admin", "Inventory"] },

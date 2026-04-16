@@ -39,3 +39,13 @@ export const getByUserSubscriptionController = async ({ user, set }) => {
     return { success: false, message: error.message };
   }
 };
+
+export const deleteSubscriptionController = async ({ user, params: { id }, set }) => {
+  try {
+    await subService.deleteSubscription(user.id, Number(id));
+    return { success: true, message: "Subscription deleted permanently" };
+  } catch (error) {
+    set.status = 400;
+    return { success: false, message: error.message };
+  }
+};

@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 
 // Get your API key from resend.com
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 export const sendResetEmail = async (email, code) => {
   // If no API key is set, log the code to console for development

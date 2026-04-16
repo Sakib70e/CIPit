@@ -1,6 +1,7 @@
 import { Elysia, t } from "elysia";
 import {
   createOrderCtrl,
+  editOrderCtrl,
   cancelOrderCtrl,
   updateAddressCtrl,
   getUserOrdersCtrl,
@@ -42,6 +43,20 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
         params: t.Object({ id: t.String() }),
         body: t.Object({ address: t.String() }),
         detail: { summary: "Update address before assignment", tags: ["Orders", "Customer"] },
+      })
+      .put("/:id", editOrderCtrl, {
+        params: t.Object({ id: t.String() }),
+        body: t.Object({
+          address: t.Optional(t.String()),
+          deliveryDate: t.Optional(t.String()),
+          items: t.Optional(t.Array(
+            t.Object({
+              itemId: t.Number(),
+              quantity: t.Number(),
+            })
+          )),
+        }),
+        detail: { summary: "Edit a pending order", tags: ["Orders", "Customer"] },
       })
   )
   // Delivery & Admin routes

@@ -48,48 +48,62 @@ export const getDashboardStats = async () => {
   today.setHours(0, 0, 0, 0);
 
   const [
-    usersCount,
-    ordersCount,
+    userRoles,
+    orderStats,
     inventorySummary,
-    deliveredOrders,
-    deliveredTodayCount,
+    pendingToday,
+    assignedToday,
+    deliveredTodayOrders,
     activeSubsCount,
     totalCustomers,
   ] = await Promise.all([
     prisma.user.groupBy({ by: ["role"], _count: true }),
     prisma.order.groupBy({ by: ["status"], _count: true }),
     prisma.inventory.findMany(),
-    prisma.order.findMany({ where: { status: "DELIVERED" }, include: { items: true } }),
     prisma.order.count({
       where: {
-        status: "DELIVERED",
-        createdAt: { gte: today },
+        status: "PENDING",
+        deliveryDate: { gte: today, lt: new Date(today.getTime() + 86400000) },
       },
+    }),
+    prisma.order.count({
+      where: {
+        status: "ASSIGNED",
+        deliveryDate: { gte: today, lt: new Date(today.getTime() + 86400000) },
+      },
+    }),
+    prisma.order.findMany({
+      where: {
+        status: "DELIVERED",
+        deliveryDate: { gte: today, lt: new Date(today.getTime() + 86400000) },
+      },
+      include: { items: true }
     }),
     prisma.subscription.count({ where: { active: true } }),
     prisma.user.count({ where: { role: "CUSTOMER" } }),
   ]);
 
   let totalRevenue = 0;
-  deliveredOrders.forEach((order) => {
+  deliveredTodayOrders.forEach((order) => {
     order.items.forEach((item) => {
       totalRevenue += item.price * item.quantity;
     });
   });
 
+  const deliveredTodayCount = deliveredTodayOrders.length;
+
   const totalStock = inventorySummary.reduce((sum, i) => sum + i.totalStock, 0);
   const reservedStock = inventorySummary.reduce((sum, i) => sum + i.reservedStock, 0);
   const availableStock = totalStock - reservedStock;
 
-  const lowStockThreshold = 10;
   const lowStockItems = inventorySummary.filter(
-    (i) => i.totalStock - i.reservedStock < lowStockThreshold
+    (i) => i.totalStock - i.reservedStock <= (i.lowStockThreshold || 10)
   );
 
   return {
     revenue: totalRevenue,
-    users: usersCount,
-    orders: ordersCount,
+    users: userRoles,
+    orders: orderStats,
     inventory: {
       totalItems: inventorySummary.length,
       totalStock,
@@ -101,7 +115,7 @@ export const getDashboardStats = async () => {
     deliveredToday: deliveredTodayCount,
     activeSubscriptions: activeSubsCount,
     totalCustomers,
-    pendingOrdersCount: ordersCount.find((o) => o.status === "PENDING")?._count || 0,
+    pendingOrdersCount: orderStats.find((o) => o.status === "PENDING")?._count || 0,
     system: {
       dbStatus: "CONNECTED",
       uptime: process.uptime(),
@@ -166,6 +180,11 @@ export const adminAssignOrder = async (orderId, agentId) => {
     },
     include: { items: true, deliveryAgent: true },
   });
+
+  await notifyUser(order.userId, "Order Assigned 🚚", `Your order #${orderId} has been assigned to ${agent.name}.`);
+  await notifyUser(agentId, "New Task Assigned 📦", `Order #${orderId} has been manually assigned to you by Admin.`);
+  
+  return result;
 };
 
 export const adjustInventoryStock = async (itemId, amount) => {

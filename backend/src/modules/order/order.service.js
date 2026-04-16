@@ -14,6 +14,8 @@ export const createOrder = async (userId, data, externalTx) => {
     const orderAddress = data.address || user.address;
     if (!orderAddress) throw new Error("Delivery address is required (none found in profile)");
 
+    const orderEmail = data.email || user.email;
+
     let deliveryDateTime = data.deliveryDate ? new Date(data.deliveryDate) : null;
 
     for (const item of data.items) {
@@ -48,6 +50,7 @@ export const createOrder = async (userId, data, externalTx) => {
       data: {
         userId,
         address: orderAddress,
+        email: orderEmail,
         deliveryDate: deliveryDateTime,
         items: { create: orderItemsData },
       },
@@ -56,6 +59,7 @@ export const createOrder = async (userId, data, externalTx) => {
 
     await notifyRole("ADMIN", "New Order Placed", `Order #${order.id} has been created.`);
     await notifyRole("DELIVERY", "New Unassigned Order", `A new order (#${order.id}) is available for assignment.`);
+    await notifyUser(userId, "Order Placed! 🚀", `Your order #${order.id} has been successfully placed.`);
 
     return calculateOrderTotals(order);
   };
@@ -63,6 +67,79 @@ export const createOrder = async (userId, data, externalTx) => {
   // If using external tx, don't wrap in new one
   if (externalTx) return await process(externalTx);
   return await prisma.$transaction(process);
+};
+
+export const editOrder = async (userId, orderId, data) => {
+  return await prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({ 
+      where: { id: orderId },
+      include: { items: true } 
+    });
+
+    if (!order || order.userId !== userId) throw new Error("Not authorized or order not found");
+    if (order.status !== "PENDING" && order.status !== "ASSIGNED") {
+      throw new Error("Cannot edit order in its current status");
+    }
+
+    // Update address if provided
+    if (data.address) {
+      await tx.order.update({ where: { id: orderId }, data: { address: data.address } });
+    }
+
+    if (data.email) {
+      await tx.order.update({ where: { id: orderId }, data: { email: data.email } });
+    }
+
+    // Update delivery date if provided
+    if (data.deliveryDate) {
+      await tx.order.update({ 
+        where: { id: orderId }, 
+        data: { deliveryDate: new Date(data.deliveryDate) } 
+      });
+    }
+
+    // Update items if provided (Requires replacing current items)
+    if (data.items && data.items.length > 0) {
+      // Restore reserved stock for old items
+      for (const item of order.items) {
+        await tx.inventory.update({
+          where: { id: item.itemId },
+          data: { reservedStock: { decrement: item.quantity } },
+        });
+      }
+
+      // Delete old items
+      await tx.orderItem.deleteMany({ where: { orderId } });
+
+      // Add new items and update stock
+      const orderItemsData = [];
+      for (const item of data.items) {
+        const dbItem = await tx.inventory.findUnique({ where: { id: item.itemId } });
+        if (!dbItem) throw new Error(`Item ${item.itemId} not found`);
+        
+        await tx.inventory.update({
+          where: { id: item.itemId },
+          data: { reservedStock: { increment: item.quantity } },
+        });
+
+        orderItemsData.push({
+          orderId,
+          itemId: item.itemId,
+          quantity: item.quantity,
+          price: dbItem.price,
+        });
+      }
+      await tx.orderItem.createMany({ data: orderItemsData });
+    }
+
+    const updated = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: true }
+    });
+
+    await notifyUser(userId, "Order Updated 📝", `Your order #${orderId} has been successfully modified.`);
+    return calculateOrderTotals(updated);
+  });
 };
 
 export const cancelOrder = async (userId, orderId) => {
@@ -149,7 +226,7 @@ export const assignOrder = async (agentId, orderId, data = {}, isAdmin = false) 
   
   if (!isAdmin && order.assignedDeliveryId) throw new Error("Order already assigned");
 
-  return prisma.order.update({
+  const orderResult = await prisma.order.update({
     where: { id: orderId },
     data: {
       assignedDeliveryId: agentId,
@@ -158,7 +235,18 @@ export const assignOrder = async (agentId, orderId, data = {}, isAdmin = false) 
       timeSlot: data.timeSlot || undefined,
     },
     include: { items: true }
-  }).then(calculateOrderTotals);
+  });
+
+  if (isAdmin) {
+    const agent = await prisma.user.findUnique({ where: { id: agentId } });
+    await notifyUser(order.userId, "Order Assigned 🚚", `Your order #${orderId} has been assigned to ${agent?.name || 'a specialist'}.`);
+    await notifyUser(agentId, "New Task Assigned 📦", `Order #${orderId} has been assigned to you.`);
+  } else {
+    // Self assignment by agent
+    await notifyUser(order.userId, "Order Accepted ✅", `A delivery specialist has accepted your order #${orderId} and is preparing for dispatch.`);
+  }
+
+  return calculateOrderTotals(orderResult);
 };
 
 export const updateOrderStatus = async (agentId, orderId, status, isAdmin = false) => {
@@ -214,7 +302,8 @@ export const updateDeliveryInfo = async (agentId, orderId, data, isAdmin = false
     include: { items: true }
   });
 
-  await notifyUser(updatedOrder.userId, "Delivery Scheduled", `Your order #${orderId} is scheduled for ${data.deliveryDate || ""} ${data.timeSlot || ""}.`);
+  const formattedDate = data.deliveryDate ? new Date(data.deliveryDate).toLocaleDateString() : 'soon';
+  await notifyUser(updatedOrder.userId, "Delivery Scheduled 🕒", `Your order #${orderId} is scheduled for ${formattedDate} during the ${data.timeSlot || "selected"} slot.`);
   return calculateOrderTotals(updatedOrder);
 };
 

@@ -31,6 +31,7 @@ export const createController = async ({ body, set }) => {
     // Parse numeric fields for Prisma compatibility
     if (data.price) data.price = parseFloat(data.price);
     if (data.totalStock) data.totalStock = parseInt(data.totalStock);
+    if (data.lowStockThreshold) data.lowStockThreshold = parseInt(data.lowStockThreshold);
 
     const item = await invService.createItem(data);
     return { success: true, message: "Item created", data: item };
@@ -50,6 +51,7 @@ export const updateController = async ({ params: { id }, body, set }) => {
     // Parse numeric fields for Prisma compatibility
     if (data.price) data.price = parseFloat(data.price);
     if (data.totalStock) data.totalStock = parseInt(data.totalStock);
+    if (data.lowStockThreshold) data.lowStockThreshold = parseInt(data.lowStockThreshold);
 
     const item = await invService.updateItem(Number(id), data);
     return { success: true, message: "Item updated", data: item };

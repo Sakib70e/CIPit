@@ -23,5 +23,8 @@
     "bun-types": "latest",
     "prisma": "6.15.0"
   },
+  "prisma": {
+    "seed": "bun src/seed.js"
+  },
   "module": "src/index.js"
-}
+}

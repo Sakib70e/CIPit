@@ -1,9 +1,4 @@
-POST http://localhost:3000/api/inventory
-Content-Type: application/json
+GET http://localhost:3000/
 
-{
-    "itemName": "Water Bottle",
-    "size": "1L",
-    "price": 10,
-    "totalStock": 100
-}
+
+ $env:REACT_NATIVE_PACKAGER_HOSTNAME="192.168.31.203"; npx expo start --lan

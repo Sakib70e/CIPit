@@ -51,6 +51,7 @@ model User {
   assignedOrders Order[]        @relation("AssignedDelivery")
   subscriptions  Subscription[]
   refreshTokens  RefreshToken[]
+  notifications  Notification[]
 }
 
 model RefreshToken {
@@ -70,6 +71,7 @@ model Inventory {
   price         Float
   totalStock    Int           @default(0)
   reservedStock Int           @default(0)
+  lowStockThreshold Int       @default(10)
   imageUrl      String?       @db.Text
   createdAt     DateTime      @default(now())
 
@@ -88,6 +90,7 @@ model Order {
   deliveryAgent      User?         @relation("AssignedDelivery", fields: [assignedDeliveryId], references: [id])
   deliveryDate       DateTime?
   timeSlot           String?
+  email              String?
   createdAt          DateTime      @default(now())
 
   items OrderItem[]
@@ -110,7 +113,21 @@ model Subscription {
   itemId           Int
   inventory        Inventory @relation(fields: [itemId], references: [id])
   quantity         Int
-  frequency        String
+  frequency        String    // Legacy field or human-readable description
+  intervalDays     Int?      // For "Every X days"
+  activeDays       String?   // For specific days "Mon,Wed,Fri"
+  preferredTime    String?   // Optional time selection
   nextDeliveryDate DateTime
   active           Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }

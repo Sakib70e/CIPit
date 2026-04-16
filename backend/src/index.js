@@ -14,6 +14,7 @@ import { userRoutes } from "./modules/user/user.routes";
 import { inventoryRoutes } from "./modules/inventory/inventory.routes";
 import { orderRoutes } from "./modules/order/order.routes";
 import { subscriptionRoutes } from "./modules/subscription/subscription.routes";
+import { notificationRoutes } from "./modules/notification/notification.routes";
 
 // Cron Logic
 import { processDailySubscriptions } from "./modules/subscription/subscription.service";
@@ -60,6 +61,7 @@ const app = new Elysia()
       .use(inventoryRoutes)
       .use(orderRoutes)
       .use(subscriptionRoutes)
+      .use(notificationRoutes)
   )
   .get("/", () => "Water Delivery API is running. Go to /swagger for docs.")
   .listen({ port: 3000, hostname: '0.0.0.0' });

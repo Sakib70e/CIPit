@@ -11,6 +11,16 @@ export const createOrderCtrl = async ({ user, body, set }) => {
   }
 };
 
+export const editOrderCtrl = async ({ user, params: { id }, body, set }) => {
+  try {
+    const order = await orderService.editOrder(user.id, Number(id), body);
+    return { success: true, message: "Order updated", data: order };
+  } catch (error) {
+    set.status = 400;
+    return { success: false, message: error.message };
+  }
+};
+
 export const cancelOrderCtrl = async ({ user, params: { id }, set }) => {
   try {
     const order = await orderService.cancelOrder(user.id, Number(id));
